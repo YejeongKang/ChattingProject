@@ -32,7 +32,7 @@ sql::PreparedStatement* pstmt;
 // 데이터베이스 주소, 사용자, 비밀번호
 const string server = "tcp://127.0.0.1:3306";
 const string username = "user";
-const string password = "1234";
+const string password = "yj1130";
 
 struct SOCKET_INFO {
     SOCKET sck;
@@ -51,9 +51,8 @@ void recv_msg(int idx);
 void del_client(int idx);
 
 int main() {
-
-    // 데이터베이스 서버 연결
     try {
+        // MySQL 데이터베이스에 연결
         driver = get_driver_instance();
         con = driver->connect(server, username, password);
     }
@@ -65,33 +64,38 @@ int main() {
     // 데이터베이스 선택
     con->setSchema("chatting_project");
 
-    // db 한글 저장을 위한 셋팅 
+    // 한글 저장을 위한 셋팅
     stmt = con->createStatement();
     stmt->execute("set names euckr");
     if (stmt) { delete stmt; stmt = nullptr; }
 
+    // Windows 소켓 초기화
     WSADATA wsa;
     int code = WSAStartup(MAKEWORD(2, 2), &wsa);
 
-    // code == 0 : 실행 성공
     if (!code) {
+        // 서버 소켓 초기화
         server_init();
 
+        // 최대 클라이언트 수 만큼 스레드 생성하여 클라이언트 연결 처리
         std::thread th1[MAX_CLIENT];
         for (int i = 0; i < MAX_CLIENT; i++) {
             th1[i] = std::thread(add_client);
         }
 
+        // 각 스레드의 종료를 대기
         for (int i = 0; i < MAX_CLIENT; i++) {
             th1[i].join();
         }
 
+        // 서버 소켓 종료
         closesocket(server_sock.sck);
     }
     else {
         cout << "프로그램 종료. (Error code : " << code << ")";
     }
 
+    // Windows 소켓 라이브러리 정리
     WSACleanup();
 
     return 0;
@@ -107,6 +111,7 @@ void insert(string from, string to, string msg) {
     pstmt->execute();
 }
 
+// 서버 소켓을 초기화하는 함수
 void server_init() {
     server_sock.sck = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
@@ -132,17 +137,21 @@ void add_client() {
 
     SOCKET_INFO new_client = {};
 
+    // 클라이언트의 연결을 받아들임
     new_client.sck = accept(server_sock.sck, (sockaddr*)&addr, &addrsize);
     recv(new_client.sck, buf, MAX_SIZE, 0);
-    // 클라이언트 아이디 저장
+    
+    // 클라이언트가 보낸 사용자 이름을 받아서 저장
     // new_client = {sck: socket, user: id}
     new_client.user = string(buf);
     sck_list.push_back(new_client);
 
+    // 서버에 클라이언트 입장 메시지 출력 및 모든 클라이언트에게 전송
     string msg = "[공지] " + new_client.user + " 님이 입장했습니다.";
     cout << msg << endl;
     send_msg(msg.c_str(), "");
 
+    // 클라이언트가 보낸 메시지를 수신하고 처리하는 스레드 시작
     std::thread th(recv_msg, client_count);
     client_count++;
 
@@ -151,14 +160,16 @@ void add_client() {
     th.join();
 }
 
-// 모든 클라이언트에게 메세지 보내기
+// 클라이언트에게 메세지 보내기
 void send_msg(const char* msg, string to) {
     if (to == "") {
+        // 모든 클라이언트에게 메시지를 전송
         for (int i = 0; i < sck_list.size(); i++) {
             send(sck_list[i].sck, msg, MAX_SIZE, 0);
         }
     }
     else {
+        // 특정 클라이언트에게 메시지를 전송 (if문 추가)
         for (int i = 0; i < sck_list.size(); i++) {
             if (sck_list[i].user == to) send(sck_list[i].sck, msg, MAX_SIZE, 0);
         }
@@ -171,10 +182,14 @@ void recv_msg(int idx) {
 
     while (1) {
         ZeroMemory(&buf, MAX_SIZE);
+
+        // 클라이언트로부터 메시지를 수신
         if (recv(sck_list[idx].sck, buf, MAX_SIZE, 0) > 0) {
             string from = sck_list[idx].user;
             string msg = buf;
             string to = "";
+
+            // 귓속말 처리
             if (msg.substr(0, 2) == "->") {
                 std::stringstream ss(msg);
                 // 공백 기준 두번째 단어 to에 저장, 임시로 msg에 ':' 저장

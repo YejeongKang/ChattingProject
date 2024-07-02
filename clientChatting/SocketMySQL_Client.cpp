@@ -35,7 +35,7 @@ sql::ResultSet* result;
 // 데이터베이스 주소, 사용자, 비밀번호
 const string server = "tcp://127.0.0.1:3306";
 const string username = "user";
-const string password = "1234";
+const string password = "yj1130";
 
 bool login(string id, string pw);
 bool idCheck(string id);
@@ -165,7 +165,11 @@ int main() {
             const char* buffer = text.c_str(); // string형을 char* 타입으로 변환
             send(client_sock, buffer, strlen(buffer), 0);
         }
+
         th2.join();
+        // join()이 while문 뒤에 위치한 이유:
+        // chat_recv 스레드가 종료될 때까지 메인 스레드가 블록되어 
+        // 사용자 입력을 처리하지 못할 수 있는 문제 예방.
         closesocket(client_sock);
     }
 
