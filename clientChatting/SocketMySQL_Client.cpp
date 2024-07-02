@@ -170,6 +170,7 @@ int main() {
         // join()이 while문 뒤에 위치한 이유:
         // chat_recv 스레드가 종료될 때까지 메인 스레드가 블록되어 
         // 사용자 입력을 처리하지 못할 수 있는 문제 예방.
+        
         closesocket(client_sock);
     }
 
